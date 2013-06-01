@@ -520,14 +520,25 @@ READ_PROC_WRAP(firegl_lock_info)
 #ifdef DEBUG
 READ_PROC_WRAP(drm_bq_info)
 #endif
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0)
 READ_PROC_WRAP(firegl_debug_proc_read)
+#endif
 READ_PROC_WRAP(firegl_bios_version)
 READ_PROC_WRAP(firegl_interrupt_info)
 READ_PROC_WRAP(firegl_ptm_info)
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0)
 static int firegl_debug_proc_write_wrap(void* file, const char *buffer, unsigned long count, void *data)
-{                                                                  
-    return firegl_debug_proc_write(file, buffer, count, data);     
+#else
+static int firegl_debug_proc_read_wrap(struct seq_file *m, void* data)
+{
+    return firegl_debug_proc_read(m->buf, m->from, m->index, m->size, m->size - m->count, data);
+}
+
+static ssize_t firegl_debug_proc_write_wrap(struct file *file, const char *buffer, size_t count, void *data)
+#endif
+{
+		return firegl_debug_proc_write(file, buffer, count, data);
 }
 
 /** \brief Callback function for reading from /proc/ati/major
@@ -543,9 +554,14 @@ static int firegl_debug_proc_write_wrap(void* file, const char *buffer, unsigned
  *
  * \return number of bytes written
  */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0)
 static int firegl_major_proc_read(char *buf, char **start, kcl_off_t offset,
                                   int request, int* eof, void* data)
+#else
+static int firegl_major_proc_read(struct seq_file *m, void* data)
+#endif
 {
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0)
     int len = 0;    // For ProcFS: fill buf from the beginning
 
     KCL_DEBUG1(FN_FIREGL_PROC, "offset %d\n", (int)offset);
@@ -561,6 +577,9 @@ static int firegl_major_proc_read(char *buf, char **start, kcl_off_t offset,
 
     len = snprintf(buf, request, "%d\n", major);
 
+#else
+	int len = seq_printf(m, "%d\n", major);
+#endif
     KCL_DEBUG1(FN_FIREGL_PROC, "return len=%i\n",len);
 
     return len;
@@ -583,6 +602,29 @@ kcl_proc_list_t KCL_PROC_FileList[] =
     { "NULL",           NULL,                       NULL} // Terminate List!!!
 };
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,0)
+static int firegl_major_proc_open(struct inode *inode, struct file *file){
+		return single_open(file, firegl_major_proc_read, NULL);
+}
+
+static const struct file_operations firegl_major_fops = {
+		.open = firegl_major_proc_open,
+		.read = seq_read,
+		.llseek = seq_lseek,
+};
+
+static int firegl_debug_proc_open(struct inode *inode, struct file *file){
+		return single_open(file, firegl_debug_proc_read_wrap, NULL);
+}
+
+static const struct file_operations firegl_debug_fops = {
+		.open = firegl_debug_proc_open,
+		.write = firegl_debug_proc_write_wrap,
+		.read = seq_read,
+		.llseek = seq_lseek,
+};
+#endif
+
 static struct proc_dir_entry *firegl_proc_init( device_t *dev,
                                                 int minor,
                                                 struct proc_dir_entry *root,
@@ -595,7 +637,11 @@ static struct proc_dir_entry *firegl_proc_init( device_t *dev,
     KCL_DEBUG1(FN_FIREGL_PROC, "minor %d, proc_list 0x%08lx\n", minor, (unsigned long)proc_list);
     if (!minor)
     {
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0)
         root = create_proc_entry("ati", S_IFDIR, NULL);
+#else
+		root = proc_mkdir("ati", NULL);
+#endif
     }
 
     if (!root)
@@ -607,18 +653,28 @@ static struct proc_dir_entry *firegl_proc_init( device_t *dev,
     if (minor == 0)
     {
         // Global major debice number entry
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0)
         ent = create_proc_entry("major", S_IFREG|S_IRUGO, root);
+#else
+		ent = proc_create("major", S_IFREG|S_IRUGO, root, &firegl_major_fops);
+#endif
         if (!ent)
         {
             remove_proc_entry("ati", NULL);
             KCL_DEBUG_ERROR("Cannot create /proc/ati/major\n");
             return NULL;
         }
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0)
         ent->read_proc = (read_proc_t*)firegl_major_proc_read;
+#endif
     }
 
     sprintf(name, "%d", minor);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0)
     *dev_root = create_proc_entry(name, S_IFDIR, root);
+#else
+	*dev_root = proc_mkdir(name, root);
+#endif
     if (!*dev_root) {
         remove_proc_entry("major", root);
         remove_proc_entry("ati", NULL);
@@ -628,7 +684,12 @@ static struct proc_dir_entry *firegl_proc_init( device_t *dev,
 
     while (list->f || list->fops)
     {
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0)
         ent = create_proc_entry(list->name, S_IFREG|S_IRUGO, *dev_root);
+#else
+		ent = proc_create_data(list->name, S_IFREG|S_IRUGO, *dev_root, &firegl_fops,
+			(dev->pubdev.signature == FGL_DEVICE_SIGNATURE)? firegl_find_device(minor) : (dev));
+#endif
         if (!ent)
         {
             KCL_DEBUG_ERROR("Cannot create /proc/ati/%s/%s\n", name, list->name);
@@ -646,6 +707,7 @@ static struct proc_dir_entry *firegl_proc_init( device_t *dev,
             return NULL;
         }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0)
         if (list->f)
         {
             ent->read_proc = (read_proc_t*)list->f;
@@ -659,19 +721,25 @@ static struct proc_dir_entry *firegl_proc_init( device_t *dev,
         {
             ent->data = (dev->pubdev.signature == FGL_DEVICE_SIGNATURE)? firegl_find_device(minor) : (dev);
         }
-
+#endif
         list++;
     }
 
     if (minor == 0)
     {
         // Global debug entry, only create it once
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0)
         ent = create_proc_entry("debug", S_IFREG|S_IRUGO, root);
+#else
+        ent = proc_create_data("debug", S_IFREG|S_IRUGO, root, &firegl_debug_fops, dev);
+#endif
         if (ent) 
         {
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0)
             ent->read_proc = (read_proc_t*)firegl_debug_proc_read_wrap;     
             ent->write_proc = (write_proc_t*)firegl_debug_proc_write_wrap;  
             ent->data = dev;
+#endif
         }
     }
 
@@ -6148,10 +6216,17 @@ void * KCL_create_proc_dir(void *root_dir, const char *name, unsigned int access
     struct proc_dir_entry *dir = NULL;
 
     if (root_dir == NULL)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0)
          dir = create_proc_entry(name, S_IFDIR | access, firegl_stub_root);
+#else
+         dir = proc_mkdir(name, firegl_stub_root);
+#endif
     else
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0)
          dir = create_proc_entry(name, S_IFDIR | access, (struct proc_dir_entry *)root_dir);
-
+#else
+         dir = proc_mkdir(name, (struct proc_dir_entry *)root_dir);
+#endif
     return dir;
 }
 
@@ -6180,13 +6255,18 @@ void KCL_create_proc_entry(void *root_dir, const char *name, unsigned int access
     if (root_dir == NULL || name == NULL)
         return;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0)
     ent = create_proc_entry(name, access_mode, (struct proc_dir_entry *)root_dir);
-
+#else
+    ent = proc_create_data(name, access_mode, (struct proc_dir_entry *)root_dir, &firegl_fops, private_data);
+#endif
     if (ent)
     {
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0)
         ent->read_proc = (read_proc_t *)read_fn;    
         ent->write_proc = (write_proc_t *)write_fn; 
         ent->data = private_data;
+#endif
     }
 }
 
