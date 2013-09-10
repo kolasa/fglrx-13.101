@@ -259,7 +259,13 @@ module_param(firegl, charp, 0);
 #endif
 
 #ifdef MODULE_LICENSE
+
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(3,11,0)
 MODULE_LICENSE("Proprietary. (C) 2002 - ATI Technologies, Starnberg, GERMANY");
+#else
+MODULE_LICENSE("GPL");
+#endif
+
 #endif
 #ifdef MODULE_DEVICE_TABLE
 MODULE_DEVICE_TABLE(pci, fglrx_pci_table);
