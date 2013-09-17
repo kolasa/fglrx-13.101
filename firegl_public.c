@@ -260,10 +260,10 @@ module_param(firegl, charp, 0);
 
 #ifdef MODULE_LICENSE
 
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(3,11,0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,12,0)
 MODULE_LICENSE("Proprietary. (C) 2002 - ATI Technologies, Starnberg, GERMANY");
 #else
-MODULE_LICENSE("GPL");
+MODULE_LICENSE("GPL\0Proprietary. (C) 2002 - ATI Technologies, Starnberg, GERMANY");
 #endif
 
 #endif
