@@ -1616,10 +1616,14 @@ KCL_TYPE_Pid ATI_API_CALL KCL_GetTgid(void)
  */
 KCL_TYPE_Uid ATI_API_CALL KCL_GetEffectiveUid(void)
 {
+#ifdef CONFIG_UIDGID_STRICT_TYPE_CHECKS
+    return __kuid_val(current_euid());
+#else
 #ifdef current_euid
     return current_euid();
 #else
     return current->euid;
+#endif
 #endif
 }
 
