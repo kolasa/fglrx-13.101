@@ -261,7 +261,11 @@ typedef struct {
  */
 typedef int             KCL_TYPE_Pid;       /** Process identifier */
 typedef int             KCL_TYPE_Tgid;      /** Thread Group identifier */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 12, 0)
 typedef int             KCL_TYPE_Uid;       /** User identifier */
+#else
+typedef kuid_t          KCL_TYPE_Uid;       /** User identifier */
+#endif
 
 /** Atomic variables
  * This type is defined using struct to make sure compiled code will
