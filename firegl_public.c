@@ -260,7 +260,7 @@ module_param(firegl, charp, 0);
 
 #ifdef MODULE_LICENSE
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3,12,0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,19,0)
 MODULE_LICENSE("Proprietary. (C) 2002 - ATI Technologies, Starnberg, GERMANY");
 #else
 MODULE_LICENSE("GPL\0Proprietary. (C) 2002 - ATI Technologies, Starnberg, GERMANY");
@@ -4588,8 +4588,13 @@ static unsigned long kasSetExecutionLevel(unsigned long level)
 {
     unsigned long orig_level;
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,19,0)
+    orig_level = __this_cpu_read(kasExecutionLevel);
+    __this_cpu_write(kasExecutionLevel,level);
+#else
     orig_level = __get_cpu_var(kasExecutionLevel);
     __get_cpu_var(kasExecutionLevel) = level;
+#endif
 
     return orig_level;
 }
@@ -4601,7 +4606,11 @@ static unsigned long kasSetExecutionLevel(unsigned long level)
  */
 static unsigned long kas_GetExecutionLevel(void)
 {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,19,0)
+    return __this_cpu_read(kasExecutionLevel);
+#else
     return __get_cpu_var(kasExecutionLevel);
+#endif
 }
 
 /** \brief Type definition for kas_spin_lock() parameter */
