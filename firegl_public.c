@@ -93,7 +93,7 @@
    and they use different config options. These options can only be enabled
    on x86_64 with newer 2.6 kernels (2.6.23 for intel, 2.6.26 for amd). 
 */
-#if defined(CONFIG_AMD_IOMMU) || defined(CONFIG_DMAR)
+#if defined(CONFIG_AMD_IOMMU) || defined(CONFIG_INTEL_IOMMU) || defined(CONFIG_DMAR)
     #define FIREGL_DMA_REMAPPING
 #endif
 
