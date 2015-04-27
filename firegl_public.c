@@ -3240,7 +3240,12 @@ int ATI_API_CALL KCL_InstallInterruptHandler(
 #else
         //when MSI enabled. keep irq disabled when calling the action handler,
         //exclude this IRQ from irq balancing (only on one CPU) 
-        ((useMSI) ? (IRQF_DISABLED | IRQF_NOBALANCING) : (IRQF_SHARED)),    
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,1,0)
+        ((useMSI) ? (IRQF_DISABLED | IRQF_NOBALANCING) : (IRQF_SHARED)),
+#else
+        ((useMSI) ? (IRQF_NOBALANCING) : (IRQF_SHARED)),
+#endif
 #endif
         dev_name,
         context);
